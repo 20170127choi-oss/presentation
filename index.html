@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>학생 발표 신청표</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<style>
+:root{--g:#2f9e5b;--gd:#217a44;--bg:#f3faf5;--card:#fff;--line:#d5e8db;--tx:#1d2b22;--mute:#5d7064;--red:#d64545;--today:#fff6c2}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:Pretendard,-apple-system,"Malgun Gothic",sans-serif;font-size:16px;background:var(--bg);color:var(--tx);overflow-x:hidden}
+.wrap{max-width:1000px;margin:0 auto;padding:20px 14px 80px}
+h1{margin:0 0 6px;font-size:28px}
+.sub{margin:0 0 14px;color:var(--mute)}
+.bar{display:flex;gap:10px;align-items:center;margin-bottom:12px}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px;min-height:44px;padding:0 16px}
+.btn{background:var(--g);color:#fff;font-weight:600}
+.btn:hover{background:var(--gd)}
+.btn.ghost{background:#e4f3e9;color:var(--gd)}
+button:disabled{opacity:.6;cursor:default}
+#state{color:var(--mute)}
+.scroll{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:16px}
+table{border-collapse:separate;border-spacing:0;width:100%;min-width:640px;table-layout:fixed}
+th,td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:6px;text-align:center;vertical-align:middle}
+th:last-child,td:last-child{border-right:0}
+tr:last-child td{border-bottom:0}
+thead th{position:sticky;top:0;background:#e4f3e9;z-index:2;padding:10px 6px}
+thead th small{display:block;font-weight:400;color:var(--mute)}
+th.rowh{width:64px;background:#f3faf5;font-weight:600;font-size:14px}
+.today{background:var(--today)}
+thead th.today{background:#ffe97a}
+.cell{min-height:44px;height:84px;display:flex;flex-direction:column;justify-content:center;gap:2px;font-size:15px}
+.name{font-weight:700}
+.topic{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--mute);font-size:14px;word-break:break-all}
+.empty{width:100%;height:100%;min-height:44px;background:transparent;color:var(--g);font-weight:600;border:2px dashed var(--line)}
+.empty:hover{background:#e4f3e9}
+.full{color:var(--mute)}
+.cancel{align-self:center;min-height:30px;padding:0 10px;font-size:13px;background:#fdecec;color:var(--red)}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:12px;z-index:10}
+.overlay.on{display:flex}
+.modal{background:#fff;border-radius:16px;padding:20px;width:100%;max-width:420px;max-height:100%;overflow:auto}
+.modal h2{margin:0 0 10px;font-size:20px}
+.modal label{display:block;margin:10px 0 4px;font-weight:600}
+.modal input{width:100%;min-height:44px;border:1px solid var(--line);border-radius:10px;padding:0 12px;font:inherit}
+.modal input:focus{outline:2px solid var(--g)}
+.note{font-size:14px;color:var(--mute);margin:12px 0}
+.acts{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);padding:12px 18px;border-radius:12px;color:#fff;display:none;z-index:20;max-width:90%}
+#toast.ok{background:var(--g)}
+#toast.err{background:var(--red)}
+#keybox{display:none;background:#fff3cd;border:1px solid #e6c65c;border-radius:12px;padding:16px}
+@media(max-width:760px){.modal{max-width:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>학생 발표 신청표</h1>
+  <p class="sub">빈 칸을 눌러 신청하세요. 비밀번호 4자리를 꼭 기억하세요.</p>
+  <div id="keybox">키를 넣어 주세요. index.html 맨 위 &lt;script&gt;의 SUPABASE_URL, SUPABASE_KEY를 Supabase 프로젝트 값(publishable key)으로 바꿔 주세요.</div>
+  <div id="app">
+    <div class="bar"><button class="btn ghost" id="refresh">새로고침</button><span id="state"></span></div>
+    <div class="scroll"><table id="grid"></table></div>
+  </div>
+</div>
+
+<div class="overlay" id="bookM"><div class="modal">
+  <h2 id="bookT"></h2>
+  <label for="bName">이름</label><input id="bName" maxlength="10" autocomplete="off">
+  <label for="bTopic">발표 주제</label><input id="bTopic" maxlength="50" autocomplete="off">
+  <label for="bPin">비밀번호 (숫자 4자리)</label><input id="bPin" type="password" inputmode="numeric" maxlength="4" autocomplete="off">
+  <label for="bPin2">비밀번호 확인</label><input id="bPin2" type="password" inputmode="numeric" maxlength="4" autocomplete="off">
+  <p class="note">비밀번호는 취소할 때 꼭 필요합니다. 잊으면 선생님께 말씀드려 주세요. 이름은 이름이나 별명만 적어 주세요.</p>
+  <div class="acts"><button class="btn ghost" data-close>닫기</button><button class="btn" id="bSave">신청하기</button></div>
+</div></div>
+
+<div class="overlay" id="cancelM"><div class="modal">
+  <h2>신청 취소</h2>
+  <p id="cText"></p>
+  <label for="cPin" style="position:absolute;left:-9999px">비밀번호</label>
+  <input id="cPin" type="password" inputmode="numeric" maxlength="4" autocomplete="off">
+  <div class="acts"><button class="btn ghost" data-close>닫기</button><button class="btn" id="cGo">취소하기</button></div>
+</div></div>
+<div id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_YOUR_KEY';
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const DAYS = ['월','화','수','목','금'];
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+if (SUPABASE_URL.includes('YOUR-PROJECT') || SUPABASE_KEY.includes('YOUR_KEY')) {
+  $('keybox').style.display = 'block';
+  $('app').style.display = 'none';
+} else {
+  start();
+}
+
+function start() {
+  const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  let rows = [], pick = null, target = null, busy = false, toastT;
+
+  function toast(msg, ok) {
+    const t = $('toast');
+    t.textContent = msg; t.className = ok ? 'ok' : 'err'; t.style.display = 'block';
+    clearTimeout(toastT); toastT = setTimeout(() => (t.style.display = 'none'), 3000);
+  }
+
+  function errMsg(e) {
+    if (e.code === '23505') return '방금 다른 친구가 먼저 신청했어요. 다른 칸을 골라 주세요.';
+    if (e.code === '23514') return '입력값이 허용 범위를 벗어났습니다.';
+    if (e.code === '42501') return '권한이 없습니다. Supabase의 RLS 정책과 열 권한을 확인해 주세요.';
+    if (e.message === 'INVALID_PIN') return '비밀번호는 숫자 4자리로 입력해 주세요.';
+    if (e.message === 'WRONG_PIN') return '비밀번호가 맞지 않습니다.';
+    if (e.message === 'NOT_FOUND') return '이미 취소되었거나 없는 신청입니다.';
+    return '오류가 발생했습니다: ' + e.message;
+  }
+
+  async function load() {
+    $('state').textContent = '불러오는 중…';
+    const { data, error } = await db.from('presentations')
+      .select('id, weekday, slot_no, student_name, topic, created_at');
+    $('state').textContent = '';
+    if (error) { toast(errMsg(error)); return; }
+    rows = data; render();
+  }
+
+  function render() {
+    const jsDay = new Date().getDay(); // 0=일 ~ 6=토
+    const today = jsDay >= 1 && jsDay <= 5 ? jsDay : 0;
+    let h = '<thead><tr><th class="rowh"></th>';
+    for (let d = 1; d <= 5; d++) {
+      const n = rows.filter((r) => r.weekday === d).length;
+      h += `<th class="${d === today ? 'today' : ''}">${DAYS[d-1]}<small>${n >= 5 ? '마감' : n + '/5명'}</small></th>`;
+    }
+    h += '</tr></thead><tbody>';
+    for (let s = 1; s <= 5; s++) {
+      h += `<tr><th class="rowh">${s}번째</th>`;
+      for (let d = 1; d <= 5; d++) {
+        const r = rows.find((x) => x.weekday === d && x.slot_no === s);
+        const cls = d === today ? ' class="today"' : '';
+        if (r) {
+          h += `<td${cls}><div class="cell"><span class="name">${esc(r.student_name)}</span><span class="topic" title="${esc(r.topic)}">${esc(r.topic)}</span><button class="cancel" data-cancel="${r.id}">취소</button></div></td>`;
+        } else {
+          h += `<td${cls}><div class="cell"><button class="empty" data-book="${d}-${s}">+ 신청</button></div></td>`;
+        }
+      }
+      h += '</tr>';
+    }
+    $('grid').innerHTML = h + '</tbody>';
+  }
+
+  function open(id) { $(id).classList.add('on'); }
+  function closeAll() { document.querySelectorAll('.overlay').forEach((o) => o.classList.remove('on')); }
+
+  $('grid').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-book]'), c = e.target.closest('[data-cancel]');
+    if (b) {
+      const [d, s] = b.dataset.book.split('-').map(Number);
+      pick = { d, s };
+      $('bookT').textContent = `${DAYS[d-1]}요일 ${s}번째`;
+      ['bName','bTopic','bPin','bPin2'].forEach((i) => ($(i).value = ''));
+      open('bookM'); $('bName').focus();
+    } else if (c) {
+      const r = rows.find((x) => x.id === Number(c.dataset.cancel));
+      if (!r) return;
+      target = r;
+      $('cText').textContent = `${DAYS[r.weekday-1]}요일 ${r.slot_no}번째 (${r.student_name}) 신청을 취소합니다. 신청할 때 정한 비밀번호 4자리를 입력하세요.`;
+      $('cPin').value = '';
+      open('cancelM'); $('cPin').focus();
+    }
+  });
+
+  document.querySelectorAll('.overlay').forEach((o) =>
+    o.addEventListener('click', (e) => { if (e.target === o || e.target.hasAttribute('data-close')) closeAll(); }));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAll(); });
+
+  $('bSave').addEventListener('click', async () => {
+    if (busy) return;
+    const name = $('bName').value.trim(), topic = $('bTopic').value.trim();
+    const pin = $('bPin').value, pin2 = $('bPin2').value;
+    if (!name) return toast('이름을 입력해 주세요.');
+    if (!topic) return toast('발표 주제를 입력해 주세요.');
+    if (!/^[0-9]{4}$/.test(pin)) return toast('비밀번호는 숫자 4자리로 입력해 주세요.');
+    if (pin !== pin2) return toast('비밀번호와 확인이 다릅니다.');
+    busy = true; $('bSave').disabled = true; $('bSave').textContent = '저장 중…';
+    const { error } = await db.rpc('book_slot', { p_weekday: pick.d, p_slot_no: pick.s, p_name: name, p_topic: topic, p_pin: pin });
+    busy = false; $('bSave').disabled = false; $('bSave').textContent = '신청하기';
+    if (error) toast(errMsg(error));
+    else { closeAll(); toast(`${DAYS[pick.d-1]}요일 ${pick.s}번째에 신청되었습니다!`, true); }
+    load();
+  });
+
+  $('cGo').addEventListener('click', async () => {
+    if (busy || !target) return;
+    busy = true; $('cGo').disabled = true;
+    const { error } = await db.rpc('cancel_slot', { p_id: target.id, p_pin: $('cPin').value });
+    busy = false; $('cGo').disabled = false;
+    if (!error) { closeAll(); toast('신청이 취소되었습니다.', true); }
+    else if (error.message === 'WRONG_PIN') { toast('비밀번호가 맞지 않습니다.'); $('cPin').value = ''; $('cPin').focus(); return; }
+    else { if (error.message === 'NOT_FOUND') closeAll(); toast(errMsg(error)); }
+    load();
+  });
+
+  $('refresh').addEventListener('click', load);
+  load();
+  setInterval(load, 30000);
+}
+</script>
+</body>
+</html>
